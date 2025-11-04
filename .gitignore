@@ -85,5 +85,3 @@ functions/node_modules/
 ## Misc
 *.tsbuildinfo
 *.log.*
-
-/frontend
