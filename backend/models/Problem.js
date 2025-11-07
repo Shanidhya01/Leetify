@@ -12,5 +12,6 @@ const ProblemSchema = new mongoose.Schema({
   tags: [String],
   examples: [{ input: String, output: String, explanation: String }],
   testcases: [TestcaseSchema],
+  favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 }, { timestamps: true });
 module.exports = mongoose.model('Problem', ProblemSchema);

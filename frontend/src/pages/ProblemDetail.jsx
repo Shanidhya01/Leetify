@@ -1,142 +1,102 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import Editor from '@monaco-editor/react';
 import SplitLayout from '../components/SplitLayout';
-import { getProblem, submitSolution } from '../api';
+import CodeEditor from '../components/CodeEditor';
+import { getProblem, submitSolution, runCode, toggleFavorite } from '../api';
 
 export default function ProblemDetail({ user }) {
   const { slug } = useParams();
   const [problem, setProblem] = useState(null);
-  const [code, setCode] = useState(`// Type your solution for ${slug} here\n`);
   const [language, setLanguage] = useState('cpp');
-  const [submitting, setSubmitting] = useState(false);
+  const [code, setCode] = useState('// write code here\n');
   const [result, setResult] = useState(null);
-  const [errorMsg, setErrorMsg] = useState(null);
-  const resultsRef = useRef();
+  const [fav, setFav] = useState(false);
+  const [input, setInput] = useState('');
 
   useEffect(() => {
-    getProblem(slug).then(r => setProblem(r.data)).catch(e => setErrorMsg(e.message));
+    fetchProblem();
   }, [slug]);
 
-  async function handleSubmit() {
-    setErrorMsg(null);
-    if (!user) {
-      setErrorMsg('You must be logged in to submit solutions.');
-      return;
-    }
-    setSubmitting(true);
-    setResult(null);
+  async function fetchProblem() {
     try {
-      const res = await submitSolution(slug, language, code);
-      // backend returns { submissionId, status, results }
-      setResult(res.data);
-      setTimeout(() => { if (resultsRef.current) resultsRef.current.scrollIntoView({ behavior: 'smooth' }); }, 200);
-    } catch (err) {
-      console.error(err);
-      setErrorMsg(err.response?.data?.error || err.message);
-    } finally {
-      setSubmitting(false);
-    }
+      const res = await getProblem(slug);
+      setProblem(res.data);
+    } catch (e) { console.error(e); }
   }
 
-  const left = (
-    <>
-      {!problem ? (
-        <div>Loading...</div>
-      ) : (
-        <>
-          <h1 className="text-2xl font-bold mb-2">{problem.title}</h1>
-          <div className="text-sm text-slate-300 mb-4">Difficulty: <span className="font-semibold">{problem.difficulty}</span></div>
-          <div className="prose prose-slate text-slate-100 mb-4" dangerouslySetInnerHTML={{ __html: (problem.description || '').replace(/\n/g,'<br/>') }} />
-          <div>
-            <h3 className="font-semibold mb-2">Examples</h3>
-            {problem.examples && problem.examples.length ? problem.examples.map((ex, idx) => (
-              <div key={idx} className="mb-3 p-3 bg-slate-700 rounded">
-                <div className="text-xs text-slate-300">Input</div>
-                <pre className="bg-slate-800 p-2 rounded mt-1">{ex.input}</pre>
-                <div className="text-xs text-slate-300 mt-2">Output</div>
-                <pre className="bg-slate-800 p-2 rounded mt-1">{ex.output}</pre>
-                {ex.explanation && <div className="text-sm text-slate-300 mt-2">{ex.explanation}</div>}
-              </div>
-            )) : <div className="text-slate-400">No examples provided.</div>}
-          </div>
+  async function handleSubmit() {
+    if (!user) return alert('Login to submit');
+    try {
+      const res = await submitSolution(slug, language, code);
+      setResult(res.data);
+    } catch (e) { console.error(e); alert(e.response?.data?.error || e.message); }
+  }
 
-          <div className="mt-6">
-            <h3 className="font-semibold mb-2">Testcases (visible inputs only)</h3>
-            {problem.testcases?.map((tc, i) => (
-              <div key={i} className="mb-2 p-2 bg-slate-700 rounded">
-                <div className="text-xs text-slate-300">Input</div>
-                <pre className="bg-slate-800 p-2 rounded mt-1">{tc.input}</pre>
-                <div className="text-xs text-slate-300 mt-2">Output</div>
-                <pre className="bg-slate-800 p-2 rounded mt-1">{tc.hidden ? 'Hidden' : tc.output}</pre>
-              </div>
-            ))}
+  async function handleRun() {
+    if (!user) return alert('Login to run');
+    try {
+      const res = await runCode(language, code, input);
+      setResult({ status: 'Run', results: [res.data] });
+    } catch (e) { console.error(e); alert(e.response?.data?.error || e.message); }
+  }
+
+  async function handleToggle() {
+    if (!user) return alert('Login to favorite');
+    try {
+      const res = await toggleFavorite(slug);
+      setFav(res.data.favorited);
+    } catch (e) { console.error(e); }
+  }
+
+  const left = !problem ? <div>Loading...</div> : (
+    <>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-bold">{problem.title}</h1>
+          <div className="text-sm text-gray-400">{problem.difficulty}</div>
+        </div>
+        <button onClick={handleToggle} className="text-yellow-300 text-2xl">{fav ? '★' : '☆'}</button>
+      </div>
+      <div className="mt-4 text-gray-200" dangerouslySetInnerHTML={{ __html: (problem.description || '').replace(/\n/g,'<br/>') }} />
+      <div className="mt-6">
+        <h3 className="font-semibold">Examples</h3>
+        {problem.examples?.map((ex, i) => (
+          <div key={i} className="bg-slate-700 p-3 rounded mt-2">
+            <div className="text-xs text-gray-300">Input</div><pre className="mt-1 bg-slate-800 p-2 rounded">{ex.input}</pre>
+            <div className="text-xs text-gray-300 mt-2">Output</div><pre className="mt-1 bg-slate-800 p-2 rounded">{ex.output}</pre>
           </div>
-        </>
-      )}
+        ))}
+      </div>
     </>
   );
 
   const right = (
-    <div className="flex-1 flex flex-col">
-      <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <select value={language} onChange={(e) => setLanguage(e.target.value)} className="bg-slate-900 text-white p-2 rounded">
-            <option value="cpp">C++</option>
-            <option value="python3">Python 3</option>
-            <option value="java">Java</option>
-            <option value="javascript">JavaScript</option>
-          </select>
-          <button onClick={handleSubmit} disabled={submitting} className="bg-blue-600 px-4 py-2 rounded">
-            {submitting ? 'Submitting...' : 'Submit'}
-          </button>
-        </div>
-        <div className="text-sm text-slate-300">Status: {result?.status || 'Idle'}</div>
+    <div className="flex flex-col h-full">
+      <div className="p-3 flex gap-3 items-center border-b border-slate-700">
+        <select value={language} onChange={e => setLanguage(e.target.value)} className="bg-slate-800 p-2 rounded">
+          <option value="cpp">C++</option>
+          <option value="python3">Python</option>
+          <option value="java">Java</option>
+          <option value="javascript">JavaScript</option>
+        </select>
+        <button onClick={handleRun} className="bg-yellow-600 px-3 py-1 rounded">Run</button>
+        <button onClick={handleSubmit} className="bg-accent px-3 py-1 rounded">Submit</button>
+        <input placeholder="stdin (optional)" value={input} onChange={e => setInput(e.target.value)} className="ml-auto bg-slate-800 p-2 rounded w-48" />
       </div>
 
       <div className="flex-1 overflow-hidden">
-        <Editor
-          height="60vh"
-          defaultLanguage={language}
-          language={language === 'python3' ? 'python' : (language === 'cpp' ? 'cpp' : language)}
-          theme="vs-dark"
-          value={code}
-          onChange={(v) => setCode(v)}
-          options={{
-            minimap: { enabled: false },
-            fontSize: 14,
-            automaticLayout: true
-          }}
-        />
+        <CodeEditor language={language} code={code} onChange={setCode} />
       </div>
 
-      <div className="p-4 border-t border-slate-700 bg-slate-900 overflow-auto" ref={resultsRef}>
-        {errorMsg && <div className="text-red-400 mb-3">{errorMsg}</div>}
-
-        {!result ? (
-          <div className="text-slate-400">Submit a solution to see results here.</div>
-        ) : (
-          <div>
-            <div className="mb-2">Submission ID: <span className="font-mono">{result.submissionId}</span></div>
-            <div className="mb-2">Overall status: <strong>{result.status}</strong></div>
-
-            <details className="bg-slate-800 p-3 rounded">
-              <summary className="cursor-pointer">Judge Responses (raw)</summary>
+      <div className="p-4 border-t border-slate-700 h-44 overflow-auto bg-slate-900 text-sm">
+        {!result ? <div className="text-gray-400">Output will appear here</div> : (
+          <>
+            <div className="mb-2">Status: <strong>{result.status}</strong></div>
+            <details className="bg-slate-800 p-2 rounded">
+              <summary>Judge responses</summary>
               <pre className="mt-2 text-xs whitespace-pre-wrap">{JSON.stringify(result.results, null, 2)}</pre>
             </details>
-
-            <div className="mt-3">
-              <h4 className="font-semibold mb-2">Per-testcase results</h4>
-              {Array.isArray(result.results) ? result.results.map((r, i) => (
-                <div key={i} className="mb-2 p-2 bg-slate-800 rounded">
-                  <div className="text-sm">Testcase #{i + 1} — {r.status?.description || r.error || 'Unknown'}</div>
-                  {r.stdout && <div className="text-xs mt-1"><strong>Stdout:</strong><pre className="bg-slate-900 p-2 rounded mt-1">{r.stdout}</pre></div>}
-                  {r.stderr && <div className="text-xs mt-1 text-red-300"><strong>Stderr:</strong><pre className="bg-slate-900 p-2 rounded mt-1">{r.stderr}</pre></div>}
-                  {r.compile_output && <div className="text-xs mt-1 text-red-300"><strong>Compile:</strong><pre className="bg-slate-900 p-2 rounded mt-1">{r.compile_output}</pre></div>}
-                </div>
-              )) : <div className="text-slate-400">No judge responses returned.</div>}
-            </div>
-          </div>
+          </>
         )}
       </div>
     </div>

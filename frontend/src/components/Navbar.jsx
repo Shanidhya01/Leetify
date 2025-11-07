@@ -11,20 +11,22 @@ export default function Navbar({ user }) {
   }
 
   return (
-    <nav className="bg-slate-900 text-white p-4 flex items-center justify-between shadow">
-      <div className="flex items-center gap-4">
-        <Link to="/" className="text-2xl font-semibold tracking-tight">LeetClone</Link>
-        <Link to="/problems" className="text-sm px-2 py-1 rounded hover:bg-slate-800">Problems</Link>
+    <nav className="bg-slate-900 text-white p-4 flex justify-between items-center shadow">
+      <div className="flex items-center gap-6">
+        <Link to="/" className="text-xl font-bold text-accent">LeetClone</Link>
+        <Link to="/problems" className="hover:underline">Problems</Link>
+        <Link to="/leaderboard" className="hover:underline">Leaderboard</Link>
+        {user && <Link to="/dashboard" className="hover:underline">Dashboard</Link>}
       </div>
 
-      <div className="flex items-center gap-4">
+      <div>
         {user ? (
-          <>
-            <div className="text-sm">{user.displayName || user.email}</div>
-            <button onClick={logout} className="bg-red-600 px-3 py-1 rounded text-sm">Logout</button>
-          </>
+          <div className="flex items-center gap-3">
+            <span className="text-sm">{user.displayName || user.email}</span>
+            <button onClick={logout} className="bg-red-600 px-3 py-1 rounded">Logout</button>
+          </div>
         ) : (
-          <button onClick={login} className="bg-green-600 px-3 py-1 rounded text-sm">Login with Google</button>
+          <button onClick={login} className="bg-green-600 px-3 py-1 rounded">Login</button>
         )}
       </div>
     </nav>
